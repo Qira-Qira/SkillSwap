@@ -4,24 +4,30 @@ import TokenManager "canister:TokenManager";
 import EscrowManager "canister:EscrowManager";
 import RatingManager "canister:RatingManager";
 import BadgeManager "canister:BadgeManager";
-import DAOGovernance "canister:DAOGovernance";
 
 import Time "mo:base/Time";
+import UserType "types/UserType";
+import ApiResponse "types/APIResponse";
+import MarketplaceListing "types/MarketplaceListing";
+import BookingSession "types/BookingSession";
+import EscrowType "types/EscrowType";
+import TokenType "types/TokenType";
+import RatingReputation "types/RatingReputation";
+import BadgeNft "types/BadgeNFT";
 
-import T "types/type";
 
 actor SkillSwapOrchestrator {
     // Unified API endpoints that coordinate multiple canisters
     
     // Complete onboarding flow
     public func complete_onboarding(
-        caller: T.UserId,
+        caller: UserType.UserId,
         name: Text,
         bio: Text,
         skills: [Text],
-        role: T.UserRole,
+        role: UserType.UserRole,
         initial_swt: Nat
-    ) : async T.ApiResult<T.UserProfile> {
+    ) : async ApiResponse.ApiResult<UserType.UserProfile> {
         
         // Create user profile
         let profile_result = await UserManager.create_user_profile(caller, name, bio, skills, role);
@@ -39,9 +45,9 @@ actor SkillSwapOrchestrator {
     
     // Complete booking flow with escrow
     public func complete_booking_flow(
-        listing_id: T.ListingId,
-        learner_did: T.DID
-    ) : async T.ApiResult<(T.Booking, EscrowManager.EscrowEntry)> {
+        listing_id: MarketplaceListing.ListingId,
+        learner_did: UserType.DID
+    ) : async ApiResponse.ApiResult<(BookingSession.Booking, EscrowType.EscrowEntry)> {
         
         // Create booking
         let booking_result = await Marketplace.create_booking(listing_id, learner_did);
@@ -72,11 +78,11 @@ actor SkillSwapOrchestrator {
     
     // Complete session completion flow
     public func complete_session_flow(
-        booking_id: T.BookingId,
-        caller_did: T.DID,
+        booking_id: BookingSession.BookingId,
+        caller_did: UserType.DID,
         rating_score: Nat,
         rating_comment: Text
-    ) : async T.ApiResult<Text> {
+    ) : async ApiResponse.ApiResult<Text> {
         
         // Mark session complete
         let booking_result = await Marketplace.mark_session_complete(booking_id, caller_did);
@@ -115,14 +121,14 @@ actor SkillSwapOrchestrator {
     };
     
     // Get comprehensive user dashboard data
-    public func get_user_dashboard(user_did: T.DID) : async T.ApiResult<{
-        profile: T.UserProfile;
-        swt_balance: T.TokenBalance;
-        rep_balance: T.TokenBalance;
-        listings: [T.Listing];
-        bookings: [T.Booking];
-        ratings: [T.Rating];
-        badges: [T.Badge];
+    public func get_user_dashboard(user_did: UserType.DID) : async ApiResponse.ApiResult<{
+        profile: UserType.UserProfile;
+        swt_balance: TokenType.TokenBalance;
+        rep_balance: TokenType.TokenBalance;
+        listings: [MarketplaceListing.Listing];
+        bookings: [BookingSession.Booking];
+        ratings: [RatingReputation.Rating];
+        badges: [BadgeNft.Badge];
     }> {
         
         // Get user profile
