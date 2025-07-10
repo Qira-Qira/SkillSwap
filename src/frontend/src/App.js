@@ -1,5 +1,5 @@
 import { html, render } from 'lit-html';
-import { skillswap_backend } from 'declarations/skillswap_backend';
+import { backend } from 'declarations/backend';
 import logo from './logo2.svg';
 
 class App {
@@ -12,7 +12,7 @@ class App {
   #handleSubmit = async (e) => {
     e.preventDefault();
     const name = document.getElementById('name').value;
-    this.greeting = await skillswap_backend.greet(name);
+    this.greeting = await backend.greet(name);
     this.#render();
   };
 

@@ -1,7 +1,7 @@
 {
   "canisters": {
-    "skillswap_backend": {
-      "main": "src/skillswap_backend/main.mo",
+    "backend": {
+      "main": "src/backend/main.mo",
       "type": "motoko",
       "dependencies": [
         "UserManager",
@@ -14,42 +14,42 @@
       ]
     },
     "UserManager": {
-      "main": "src/skillswap_backend/actors/UserManager.mo",
+      "main": "src/backend/actors/UserManager.mo",
       "type": "motoko"
     },
     "TokenManager": {
-      "main": "src/skillswap_backend/actors/TokenManager.mo",
+      "main": "src/backend/actors/TokenManager.mo",
       "type": "motoko"
     },
     "RatingManager": {
-      "main": "src/skillswap_backend/actors/RatingManager.mo",
+      "main": "src/backend/actors/RatingManager.mo",
       "type": "motoko"
     },
     "Marketplace": {
-      "main": "src/skillswap_backend/actors/Marketplace.mo",
+      "main": "src/backend/actors/Marketplace.mo",
       "type": "motoko"
     },
     "EscrowManager": {
-      "main": "src/skillswap_backend/actors/EscrowManager.mo",
+      "main": "src/backend/actors/EscrowManager.mo",
       "type": "motoko"
     },
     "DAOGovernance": {
-      "main": "src/skillswap_backend/actors/DAOGovernance.mo",
+      "main": "src/backend/actors/DAOGovernance.mo",
       "type": "motoko"
     },
     "BadgeManager": {
-      "main": "src/skillswap_backend/actors/BadgeManager.mo",
+      "main": "src/backend/actors/BadgeManager.mo",
       "type": "motoko"
     },
-    "skillswap_frontend": {
+    "frontend": {
       "dependencies": [
-        "skillswap_backend"
+        "backend"
       ],
       "source": [
-        "src/skillswap_frontend/dist"
+        "src/frontend/dist"
       ],
       "type": "assets",
-      "workspace": "skillswap_frontend"
+      "workspace": "frontend"
     }
   },
   "defaults": {
