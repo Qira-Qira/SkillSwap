@@ -10,7 +10,8 @@
         "Marketplace",
         "EscrowManager",
         "DAOGovernance",
-        "BadgeManager"
+        "BadgeManager",
+        "PaymentGateway"
       ]
     },
     "UserManager": {
@@ -39,6 +40,10 @@
     },
     "BadgeManager": {
       "main": "src/backend/actors/BadgeManager.mo",
+      "type": "motoko"
+    },
+    "PaymentGateway": {
+      "main": "src/backend/actors/PaymentGateway.mo",
       "type": "motoko"
     },
     "frontend": {

@@ -35,7 +35,7 @@ actor DAOGovernance {
     private let token_manager : actor {
         get_rep_balance : (UserType.DID) -> async TokenType.TokenBalance;
         update_platform_fee : (Float) -> async ApiResponse.ApiResult<()>;
-    } = actor "ucwa4-rx777-77774-qaada-cai"; // Replace with actual TokenManager canister ID
+    } = actor "ufxgi-4p777-77774-qaadq-cai"; // Replace with actual TokenManager canister ID
 
     // Create new governance proposal
     public func create_proposal(proposer_did : UserType.DID, proposal_type : DaoGovernance.ProposalType, description : Text) : async ApiResponse.ApiResult<DaoGovernance.Proposal> {

@@ -2,8 +2,6 @@ import HashMap "mo:base/HashMap";
 import Text "mo:base/Text";
 import Principal "mo:base/Principal";
 import Nat "mo:base/Nat";
-import Time "mo:base/Time";
-import Option "mo:base/Option";
 import Float "mo:base/Float";
 import Buffer "mo:base/Buffer";
 import Iter "mo:base/Iter";

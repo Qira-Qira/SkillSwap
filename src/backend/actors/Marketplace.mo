@@ -3,7 +3,6 @@ import Text "mo:base/Text";
 import Nat "mo:base/Nat";
 import Hash "mo:base/Hash";
 import Option "mo:base/Option";
-import Time "mo:base/Time";
 import Array "mo:base/Array";
 import Buffer "mo:base/Buffer";
 

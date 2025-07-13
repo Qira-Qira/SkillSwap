@@ -2,8 +2,8 @@ import HashMap "mo:base/HashMap";
 import Text "mo:base/Text";
 import Nat "mo:base/Nat";
 import Option "mo:base/Option";
-import Int "mo:base/Int";
 import Float "mo:base/Float";
+import Principal "mo:base/Principal";
 
 import UserType "../types/UserType";
 import TokenType "../types/TokenType";
@@ -36,6 +36,39 @@ actor TokenManager {
 
     private stable var platform_treasury : StateToken.PlatformTreasury = {
         platform_teasury = 0;
+    };
+
+    // MintSWT (TopUp)
+    public func mint(to_did : UserType.UserId, amount : Nat) : async ApiResponse.ApiResult<()> {
+        let text : Text = Principal.toText(to_did);
+        let current_balance = Option.get(balances.swt_balances.get(text), 0);
+        balances.swt_balances.put(text, current_balance + amount);
+
+        // Update total supply
+        swt := { swt_total_supply = swt.swt_total_supply + amount };
+
+        #ok(());
+    };
+
+    // BurnSWT (Withdrawal)
+    public func burn_swt(from_did : UserType.DID, amount : Nat) : async ApiResponse.ApiResult<()> {
+        let current_balance = Option.get(balances.swt_balances.get(from_did), 0);
+
+        if (current_balance < amount) {
+            return #err("Insufficient balance");
+        };
+
+        balances.swt_balances.put(from_did, current_balance - amount);
+
+        // Update total supply
+        swt := { swt_total_supply = swt.swt_total_supply - amount };
+
+        #ok(());
+    };
+
+    // Query Total Supply
+    public query func get_swt_total_supply() : async Nat {
+        swt.swt_total_supply;
     };
 
     // Initialize user balance (for testing/onboarding)
@@ -72,8 +105,8 @@ actor TokenManager {
     };
 
     // Refund SWT from escrow back to learner
-    public func refund_swt_escrow(learner_did : UserType.DID, amount : Nat, booking_id : BookingSession.BookingId) : async ApiResponse.ApiResult<()> {
-        let learner_balance = Option.get(balances.swt_balances.get(learner_did), 0); 
+    public func refund_swt_escrow(learner_did : UserType.DID, amount : Nat, _booking_id : BookingSession.BookingId) : async ApiResponse.ApiResult<()> {
+        let learner_balance = Option.get(balances.swt_balances.get(learner_did), 0);
         balances.swt_balances.put(learner_did, learner_balance + amount);
         return #ok(());
     };

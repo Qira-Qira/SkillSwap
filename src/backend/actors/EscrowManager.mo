@@ -24,7 +24,7 @@ actor EscrowManager {
         lock_swt_escrow : (UserType.DID, Nat, BookingSession.BookingId) -> async ApiResponse.ApiResult<()>;
         release_swt_escrow : (UserType.DID, Nat, BookingSession.BookingId) -> async ApiResponse.ApiResult<()>;
         refund_swt_escrow : (UserType.DID, Nat, BookingSession.BookingId) -> async ApiResponse.ApiResult<()>;
-    } = actor "ucwa4-rx777-77774-qaada-cai"; // Replace with actual TokenManager canister ID
+    } = actor "ufxgi-4p777-77774-qaadq-cai"; // Replace with actual TokenManager canister ID
 
     // Lock tokens in escrow for a booking
     public func create_escrow(booking_id : BookingSession.BookingId, learner_did : UserType.DID, tutor_did : UserType.DID, amount : Nat) : async ApiResponse.ApiResult<EscrowType.EscrowEntry> {

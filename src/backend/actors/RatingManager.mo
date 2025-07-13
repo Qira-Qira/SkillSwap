@@ -4,8 +4,7 @@ import Nat "mo:base/Nat";
 import Hash "mo:base/Hash";
 import Option "mo:base/Option";
 import Float "mo:base/Float";
-import Time "mo:base/Time";
-import Array "mo:base/Array";
+
 
 import BookingSession "../types/BookingSession";
 import RatingReputation "../types/RatingReputation";
@@ -24,17 +23,17 @@ actor RatingManager {
     // Inter-canister calls
     private let user_manager : actor {
         update_user_rating : (UserType.DID, Float, Nat) -> async ApiResponse.ApiResult<()>;
-    } = actor "ufxgi-4p777-77774-qaadq-cai"; // Replace with actual UserManager canister ID
+    } = actor "vizcg-th777-77774-qaaea-cai"; // Replace with actual UserManager canister ID
 
     private let token_manager : actor {
         mint_rep_tokens : (UserType.DID, Nat, Float) -> async ApiResponse.ApiResult<Nat>;
-    } = actor "ucwa4-rx777-77774-qaada-cai"; // Replace with actual TokenManager canister ID
+    } = actor "ufxgi-4p777-77774-qaadq-cai"; // Replace with actual TokenManager canister ID
 
     // Submit rating after completed session
     public func submit_rating(booking_id : BookingSession.BookingId, from_did : UserType.DID, to_did : UserType.DID, score : Nat, comment : Text) : async ApiResponse.ApiResult<RatingReputation.Rating> {
         let result = await SubmitRating.submit_rating(rating, booking_id, from_did, to_did, score, comment);
         switch (result) {
-            case (#ok(value)) {
+            case (#ok(_value)) {
                 // Update user's overall rating in UserManager
                 let _ = await user_manager.update_user_rating(to_did, Float.fromInt(score), 1);
 

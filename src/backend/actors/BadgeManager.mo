@@ -34,11 +34,11 @@ actor BadgeManager {
     // Inter-canister calls
     private let user_manager : actor {
         get_user_profile : (UserType.DID) -> async ApiResponse.ApiResult<UserType.UserProfile>;
-    } = actor "ufxgi-4p777-77774-qaadq-cai"; // Replace with actual UserManager canister ID
+    } = actor "vizcg-th777-77774-qaaea-cai"; // Replace with actual UserManager canister ID
 
     private let rating_manager : actor {
         get_user_average_rating : (UserType.DID) -> async Float;
-    } = actor "ulvla-h7777-77774-qaacq-cai"; // Replace with actual RatingManager canister ID
+    } = actor "ucwa4-rx777-77774-qaada-cai"; // Replace with actual RatingManager canister ID
 
     // Check and mint badges for user based on achievements
     public func check_and_mint_badges(user_did : UserType.DID) : async ApiResponse.ApiResult<[BadgeNft.Badge]> {
