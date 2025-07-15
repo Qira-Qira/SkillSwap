@@ -15,6 +15,7 @@ import Error "mo:base/Error";
 import Int "mo:base/Int";
 import Char "mo:base/Char";
 import Hash "mo:base/Hash";
+import Buffer "mo:base/Buffer";
 
 import ICPLedger "../types/ICPLedger";
 import Token "../types/Token";
@@ -29,9 +30,10 @@ actor PaymentGateway {
     private let conversionRate : Nat = 100; // 1 ICP = 100 SWT
     private let fee : Nat = 10_000; // Biaya transaksi ICP (0.0001 ICP)
     private let orderExpiry : Int = 300_000_000_000; // 5 menit dalam nanoseconds
+    private let MIN_PAYMENT : Nat = 1_000_000; // Minimum 0.01 ICP
 
     // Principal pemilik (ganti dengan principal Anda)
-    private stable let ownerPrincipal : Principal = Principal.fromText("fxszr-sclx6-zvbzn-gffa6-rrqm2-42f6b-lhnt5-cju7l-trzgs-f3ibp-eqe");
+    private stable var ownerPrincipal : Principal = Principal.fromText("2vxsx-fae");
 
     // Mock untuk testing lokal
     private var mockLedger = HashMap.HashMap<Blob, Nat>(
@@ -73,6 +75,43 @@ actor PaymentGateway {
         orders := [];
     };
 
+    // ===== OWNER MANAGEMENT =====
+
+    // Set owner (can only be called once or by current owner)
+    public shared (msg) func setOwner(newOwner : Principal) : async Result.Result<(), Text> {
+        // Allow setting owner if current owner is anonymous (first time setup)
+        // or if caller is current owner
+        if (ownerPrincipal == Principal.fromText("2vxsx-fae") or msg.caller == ownerPrincipal) {
+            ownerPrincipal := newOwner;
+            Debug.print("Owner set to: " # Principal.toText(newOwner));
+            #ok();
+        } else {
+            #err("Access denied");
+        };
+    };
+
+    // Get current owner
+    public query func getOwner() : async Principal {
+        ownerPrincipal;
+    };
+
+    // Debug function to check caller
+    public shared (msg) func debug_caller() : async {
+        caller: Principal;
+        owner: Principal;
+        isMatch: Bool;
+        callerText: Text;
+        ownerText: Text;
+    } {
+        {
+            caller = msg.caller;
+            owner = ownerPrincipal;
+            isMatch = msg.caller == ownerPrincipal;
+            callerText = Principal.toText(msg.caller);
+            ownerText = Principal.toText(ownerPrincipal);
+        }
+    };
+
     // ===== PUBLIC INTERFACE =====
 
     // Set token canister ID (panggil setelah deploy token canister)
@@ -81,17 +120,32 @@ actor PaymentGateway {
     };
 
     // Start a purchase
-    public shared (msg) func startPurchase(icpAmountE8s : Nat) : async {
+    public shared (msg) func startPurchase(icpAmountE8s : Nat) : async Result.Result<{
         depositAddress : Text;
         orderId : OrderId;
-    } {
+        expiresAt : Int;
+    }, Text> {
+        // Validate amount
+        if (icpAmountE8s < MIN_PAYMENT) {
+            return #err("Amount too small. Minimum: " # Nat.toText(MIN_PAYMENT) # " e8s");
+        };
+
+        // Check if token canister is set
+        switch (token) {
+            case (null) {
+                return #err("Token canister not set");
+            };
+            case (?_) {};
+        };
+
         let orderId = nextOrderId;
         nextOrderId += 1;
 
         let depositAddressBlob = generateDepositAddress(msg.caller, orderId);
         let depositAddressHex = toHex(depositAddressBlob);
+        let expiresAt = Time.now() + orderExpiry;
 
-        // Simpan order
+        // Save order
         ordersMap.put(
             orderId,
             {
@@ -104,16 +158,17 @@ actor PaymentGateway {
         );
 
         Debug.print(
-            "Order dibuat: "
-            # " | OrderID: " # Nat.toText(orderId)
-            # " | Alamat: " # depositAddressHex
-            # " | Jumlah: " # Nat.toText(icpAmountE8s) # " e8s"
+            "Order created: OrderID: " # Nat.toText(orderId)
+            # " | Address: " # depositAddressHex
+            # " | Amount: " # Nat.toText(icpAmountE8s) # " e8s"
+            # " | Expires: " # Int.toText(expiresAt)
         );
 
-        {
+        #ok({
             depositAddress = depositAddressHex;
             orderId = orderId;
-        };
+            expiresAt = expiresAt;
+        });
     };
 
     // Complete purchase (works for both testnet and mainnet)
@@ -244,23 +299,74 @@ actor PaymentGateway {
 
     // ===== QUERY FUNCTIONS =====
 
-    // Get order status
+     // Get all orders for a user
+    public query (msg) func getMyOrders() : async [{
+        orderId : OrderId;
+        status : OrderStatus;
+        amountExpected : Nat;
+        depositAddress : Text;
+        createdAt : Int;
+        expiresAt : Int;
+    }] {
+        let userOrders = Buffer.Buffer<{
+            orderId : OrderId;
+            status : OrderStatus;
+            amountExpected : Nat;
+            depositAddress : Text;
+            createdAt : Int;
+            expiresAt : Int;
+        }>(0);
+
+        for ((orderId, order) in ordersMap.entries()) {
+            if (order.buyer == msg.caller) {
+                userOrders.add({
+                    orderId = orderId;
+                    status = order.status;
+                    amountExpected = order.amountExpected;
+                    depositAddress = toHex(order.depositAddress);
+                    createdAt = order.createdAt;
+                    expiresAt = order.createdAt + orderExpiry;
+                });
+            };
+        };
+
+        Buffer.toArray(userOrders);
+    };
+
+    // Get minimum payment
+    public query func getMinimumPayment() : async Nat {
+        MIN_PAYMENT;
+    };
+
+    // Get conversion rate
+    public query func getConversionRate() : async Nat {
+        conversionRate;
+    };
+
+    // Get order status with more details
     public query func getOrderStatus(orderId : OrderId) : async ?{
         buyer : Principal;
         status : OrderStatus;
         amountExpected : Nat;
         depositAddress : Text;
         createdAt : Int;
+        expiresAt : Int;
+        isExpired : Bool;
     } {
         switch (ordersMap.get(orderId)) {
             case (null) { null };
             case (?order) {
+                let expiresAt = order.createdAt + orderExpiry;
+                let isExpired = Time.now() > expiresAt;
+                
                 ?{
                     buyer = order.buyer;
                     status = order.status;
                     amountExpected = order.amountExpected;
                     depositAddress = toHex(order.depositAddress);
                     createdAt = order.createdAt;
+                    expiresAt = expiresAt;
+                    isExpired = isExpired;
                 };
             };
         };
@@ -275,18 +381,18 @@ actor PaymentGateway {
 
     // ===== TESTING HELPERS =====
 
-    // Fungsi untuk simulasi pembayaran (hanya untuk testing lokal)
-    public func simulatePayment(depositAddress : Text, amountE8s : Nat) : async () {
+   // Simulate payment (local testing only)
+    public func simulatePayment(depositAddress : Text, amountE8s : Nat) : async Result.Result<(), Text> {
         let addressBlob = switch (hexToBlob(depositAddress)) {
-            case (null) { return };
+            case (null) { return #err("Invalid address format"); };
             case (?blob) { blob };
         };
 
         mockLedger.put(addressBlob, amountE8s);
         Debug.print(
-            "Simulasi pembayaran: "
-            # Nat.toText(amountE8s) # " e8s ke " # depositAddress
+            "Payment simulated: " # Nat.toText(amountE8s) # " e8s to " # depositAddress
         );
+        #ok();
     };
 
     public query func getCanisterAccountHex() : async Text {
@@ -302,10 +408,16 @@ actor PaymentGateway {
         let canisterId = Principal.fromActor(PaymentGateway);
         let canisterBlob = Principal.toBlob(canisterId);
 
+        // Create more unique address by including timestamp
+        let timeBlob = Blob.fromArray(beBytes(Int.abs(Time.now())));
+
         Blob.fromArray(
             Array.append(
-                Array.append(Blob.toArray(userBlob), Blob.toArray(orderBlob)),
-                Blob.toArray(canisterBlob),
+                Array.append(
+                    Array.append(Blob.toArray(userBlob), Blob.toArray(orderBlob)),
+                    Blob.toArray(canisterBlob)
+                ),
+                Blob.toArray(timeBlob)
             )
         );
     };
@@ -327,46 +439,50 @@ actor PaymentGateway {
         let chars = Iter.toArray(Text.toIter(hex));
         if (chars.size() % 2 != 0) return null;
 
-        var bytes : [var Nat8] = Array.init<Nat8>(chars.size() / 2, 0);
+        let bytes = Array.init<Nat8>(chars.size() / 2, 0);
         var i = 0;
 
         while (i < chars.size()) {
             let highChar = chars[i];
             let lowChar = chars[i + 1];
 
-            // Fungsi helper untuk convert char ke Nat8
-            let charToNat8 = func(c : Char) : Nat8 {
+            let charToNat8 = func(c : Char) : ?Nat8 {
                 switch (c) {
-                    case ('0') { 0 };
-                    case ('1') { 1 };
-                    case ('2') { 2 };
-                    case ('3') { 3 };
-                    case ('4') { 4 };
-                    case ('5') { 5 };
-                    case ('6') { 6 };
-                    case ('7') { 7 };
-                    case ('8') { 8 };
-                    case ('9') { 9 };
-                    case ('a') { 10 };
-                    case ('b') { 11 };
-                    case ('c') { 12 };
-                    case ('d') { 13 };
-                    case ('e') { 14 };
-                    case ('f') { 15 };
-                    case ('A') { 10 };
-                    case ('B') { 11 };
-                    case ('C') { 12 };
-                    case ('D') { 13 };
-                    case ('E') { 14 };
-                    case ('F') { 15 };
-                    case (_) { 0 };
+                    case ('0') { ?0 };
+                    case ('1') { ?1 };
+                    case ('2') { ?2 };
+                    case ('3') { ?3 };
+                    case ('4') { ?4 };
+                    case ('5') { ?5 };
+                    case ('6') { ?6 };
+                    case ('7') { ?7 };
+                    case ('8') { ?8 };
+                    case ('9') { ?9 };
+                    case ('a') { ?10 };
+                    case ('b') { ?11 };
+                    case ('c') { ?12 };
+                    case ('d') { ?13 };
+                    case ('e') { ?14 };
+                    case ('f') { ?15 };
+                    case ('A') { ?10 };
+                    case ('B') { ?11 };
+                    case ('C') { ?12 };
+                    case ('D') { ?13 };
+                    case ('E') { ?14 };
+                    case ('F') { ?15 };
+                    case (_) { null };
                 };
             };
 
-            let high : Nat8 = charToNat8(highChar);
-            let low : Nat8 = charToNat8(lowChar);
+            switch (charToNat8(highChar), charToNat8(lowChar)) {
+                case (?high, ?low) {
+                    bytes[i / 2] := (high * 16) + low;
+                };
+                case (_, _) {
+                    return null;
+                };
+            };
 
-            bytes[i / 2] := (high * 16) + low;
             i += 2;
         };
 
@@ -374,13 +490,12 @@ actor PaymentGateway {
     };
 
     private func beBytes(n : Nat) : [Nat8] {
-        var num = n;
-        var size = 8; // 64-bit
+        let size = 8; // 64-bit
         Array.tabulate<Nat8>(
             size,
-            func i {
+            func (i) {
                 let shift = (size - i - 1) * 8;
-                Nat8.fromIntWrap(num / (2 ** shift));
+                Nat8.fromIntWrap(n / (2 ** shift));
             },
         );
     };
@@ -389,7 +504,7 @@ actor PaymentGateway {
         // Di mainnet, gunakan ICP Ledger asli
         let canisterId = Principal.fromActor(PaymentGateway);
         let canisterIdText = Principal.toText(canisterId);
-        if (canisterIdText != "rdmx6-jaaaa-aaaaa-aaadq-cai") { // Bukan di local replica
+        if (canisterIdText != "ulvla-h7777-77774-qaacq-cai") { // Bukan di local replica
             try {
                 let ledger : actor { 
                     account_balance : ICPLedger.AccountBalanceArgs -> async ICPLedger.AccountBalanceResult 

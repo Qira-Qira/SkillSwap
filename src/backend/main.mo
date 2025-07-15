@@ -69,13 +69,18 @@ actor SkillSwapOrchestrator {
         
         // Start purchase in payment gateway
         let purchase_result = await PaymentGateway.startPurchase(icp_amount_e8s);
-        
-        return #ok({
-            orderId = purchase_result.orderId;
-            depositAddress = purchase_result.depositAddress;
-            expectedAmount = icp_amount_e8s;
-            expiryTime = Time.now() + 300_000_000_000; // 5 minutes
-        });
+
+        switch (purchase_result) {
+            case (#err(msg)) { return #err("Failed to start purchase: " # msg) };
+            case (#ok(purchase_info)) {
+                return #ok({
+                    orderId = purchase_info.orderId;
+                    depositAddress = purchase_info.depositAddress;
+                    expectedAmount = icp_amount_e8s;
+                    expiryTime = Time.now() + 300_000_000_000; // 5 minutes
+                });
+            };
+        };
     };
     
     // Complete ICP to SWT purchase and mint tokens
