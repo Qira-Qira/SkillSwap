@@ -3,6 +3,7 @@ import Nat "mo:base/Nat";
 import Hash "mo:base/Hash";
 import Time "mo:base/Time";
 import Buffer "mo:base/Buffer";
+import Iter "mo:base/Iter";
 
 import BookingSession "../types/BookingSession";
 import UserType "../types/UserType";
@@ -15,8 +16,35 @@ import RefundEscrow "../services/escrow/RefundEscrow";
 
 actor EscrowManager {
 
+    // Stable storage for upgrades
+    private stable var escrow_entries_stable : [(BookingSession.BookingId, EscrowType.EscrowEntry)] = [];
+    
+    // Runtime HashMap for efficient operations
     private var escrow_entries : StateEscrow.EscrowEntries = {
         escrow_entries = HashMap.HashMap<BookingSession.BookingId, EscrowType.EscrowEntry>(0, Nat.equal, Hash.hash);
+    };
+
+    // Initialize HashMap from stable storage on startup
+    system func preupgrade() {
+        escrow_entries_stable := Iter.toArray(escrow_entries.escrow_entries.entries());
+    };
+
+    system func postupgrade() {
+        let new_map = HashMap.HashMap<BookingSession.BookingId, EscrowType.EscrowEntry>(
+            escrow_entries_stable.size(), 
+            Nat.equal, 
+            Hash.hash
+        );
+        
+        for ((booking_id, escrow_entry) in escrow_entries_stable.vals()) {
+            new_map.put(booking_id, escrow_entry);
+        };
+        
+        escrow_entries := {
+            escrow_entries = new_map;
+        };
+        
+        escrow_entries_stable := [];
     };
 
     // Inter-canister calls to Token Manager
@@ -80,5 +108,14 @@ actor EscrowManager {
             case (?escrow) { #ok(escrow) };
             case null { #err("Escrow not found") };
         };
+    };
+
+    // Additional helper functions for monitoring
+    public query func get_all_escrows() : async [(BookingSession.BookingId, EscrowType.EscrowEntry)] {
+        Iter.toArray(escrow_entries.escrow_entries.entries());
+    };
+
+    public query func get_escrow_count() : async Nat {
+        escrow_entries.escrow_entries.size();
     };
 };
