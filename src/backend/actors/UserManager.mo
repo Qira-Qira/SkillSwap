@@ -13,12 +13,15 @@ import StateUser "../storages/StateUser";
 import CreateUser "../services/user/CreateUser";
 import UpdateProfile "../services/user/UpdateProfile";
 import UpdateUserRating "../services/user/UpdateUserRating";
+import GetAllTutors "../services/user/GetAllTutors";
+import GetUserDid "../services/user/GetUserDID";
+import GetUserProfile "../services/user/GetUserProfile";
 
 actor UserManager {
 
     // State variables - persistent storage
     private stable var state : StateUser.UserCounter = {
-        user_counter = 0;
+        user_counter = 1;
     };
 
     // Stable arrays to persist data during upgrades
@@ -101,8 +104,7 @@ actor UserManager {
 
     // Create new user profile and DID
     public func create_user_profile(caller : UserType.UserId, name : Text, bio : Text, skills : [Text], role : UserType.UserRole) : async ApiResponse.ApiResult<UserType.UserProfile> {
-        let did_user = StateUser.get_user_counter(state);
-        let result = await CreateUser.create_user_profile(did_user, models, caller, name, bio, skills, role);
+        let result = await CreateUser.create_user_profile(state, models, caller, name, bio, skills, role);
         switch (result) {
             case (#ok(_profile)) {
                 state := StateUser.increment_user_counter(state);
@@ -114,18 +116,12 @@ actor UserManager {
 
     // Get user profile by DID
     public query func get_user_profile(did : UserType.DID) : async ApiResponse.ApiResult<UserType.UserProfile> {
-        switch (models.users.get(did)) {
-            case (?profile) { #ok(profile) };
-            case null { #err("User profile not found") };
-        };
+        return GetUserProfile.get_user_profile(models.users, did);
     };
 
     // Get user's DID from their principal
     public query func get_user_did(principal : UserType.UserId) : async ApiResponse.ApiResult<UserType.DID> {
-        switch (models.principal_to_did.get(principal)) {
-            case (?did) { #ok(did) };
-            case null { #err("No DID found for this principal") };
-        };
+       return GetUserDid.get_user_did(models.principal_to_did, principal);
     };
 
     // Update user profile
@@ -140,19 +136,6 @@ actor UserManager {
 
     // Get all tutors (for marketplace browsing)
     public query func get_all_tutors() : async [UserType.UserProfile] {
-        let tutor_buffer = Buffer.Buffer<UserType.UserProfile>(0);
-
-        for ((did, profile) in models.users.entries()) {
-            switch (profile.role) {
-                case (#Tutor or #Both) {
-                    tutor_buffer.add(profile);
-                };
-                case (#Learner) {
-                    // Skip learner-only profiles
-                };
-            };
-        };
-
-        Buffer.toArray(tutor_buffer);
+       return GetAllTutors.get_all_tutors(models.users);
     };
 };

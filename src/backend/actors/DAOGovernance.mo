@@ -14,6 +14,9 @@ import StateDao "../storages/StateDao";
 import CreateProposal "../services/dao/CreateProposal";
 import VoteOnProposal "../services/dao/VoteOnProposal";
 import ExecuteProposal "../services/dao/ExecuteProposal";
+import GetActiveProposals "../services/dao/GetActiveProposals";
+import GetProposal "../services/dao/GetProposal";
+import GetUserVotes "../services/dao/GetUserVotes";
 
 actor DAOGovernance {
 
@@ -39,9 +42,7 @@ actor DAOGovernance {
 
     // Create new governance proposal
     public func create_proposal(proposer_did : UserType.DID, proposal_type : DaoGovernance.ProposalType, description : Text) : async ApiResponse.ApiResult<DaoGovernance.Proposal> {
-        // Check if user has enough REP tokens to propose
-        let proposer_rep = await token_manager.get_rep_balance(proposer_did);
-        let result_create_proposal = await CreateProposal.create_proposal(min_voting_power, quorum_threshold, proposer_rep, proposal_counter, voting_period_duration, dao_hashmap, proposer_did, proposal_type, description);
+        let result_create_proposal = await CreateProposal.create_proposal(min_voting_power, quorum_threshold, token_manager, proposal_counter, voting_period_duration, dao_hashmap, proposer_did, proposal_type, description);
         switch (result_create_proposal) {
             case (#ok(value)) {
                 proposal_counter := StateDao.set_proposal_counter(proposal_counter);
@@ -71,7 +72,7 @@ actor DAOGovernance {
                 await ExecuteProposal.execute_proposal(dao_hashmap, execution_result, proposal_id);
             };
             case null {
-                return #err("Proposal not found")
+                return #err("Proposal not found");
             };
         };
     };
@@ -99,36 +100,17 @@ actor DAOGovernance {
 
     // Get all active proposals
     public query func get_active_proposals() : async [DaoGovernance.Proposal] {
-        let proposal_buffer = Buffer.Buffer<DaoGovernance.Proposal>(0);
-
-        for ((id, proposal) in dao_hashmap.proposals.entries()) {
-            if (proposal.status == #Active and Time.now() <= proposal.voting_ends_at) {
-                proposal_buffer.add(proposal);
-            };
-        };
-
-        Buffer.toArray(proposal_buffer);
+        return GetActiveProposals.get_active_proposals(dao_hashmap.proposals);
     };
 
     // Get proposal by ID
     public query func get_proposal(proposal_id : DaoGovernance.ProposalId) : async ApiResponse.ApiResult<DaoGovernance.Proposal> {
-        switch (dao_hashmap.proposals.get(proposal_id)) {
-            case (?proposal) { #ok(proposal) };
-            case null { #err("Proposal not found") };
-        };
+        return GetProposal.get_proposal(dao_hashmap.proposals, proposal_id);
     };
 
     // Get user's voting history
     public query func get_user_votes(user_did : UserType.DID) : async [(DaoGovernance.ProposalId, Bool)] {
-        let vote_buffer = Buffer.Buffer<(DaoGovernance.ProposalId, Bool)>(0);
-
-        for (((proposal_id, voter_did), vote) in dao_hashmap.user_votes.entries()) {
-            if (voter_did == user_did) {
-                vote_buffer.add((proposal_id, vote));
-            };
-        };
-
-        Buffer.toArray(vote_buffer);
+        return GetUserVotes.get_user_votes(dao_hashmap.user_votes, user_did);
     };
 
     // Update DAO parameters (internal governance)

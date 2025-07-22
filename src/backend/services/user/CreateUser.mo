@@ -3,10 +3,11 @@ import ApiResponse "../../types/APIResponse";
 import StateUser "../../storages/StateUser";
 import Time "mo:base/Time";
 import Nat "mo:base/Nat";
+
 module {
     // Create new user profile and DID
     public func create_user_profile(
-        did_user : Nat,
+        state : StateUser.UserCounter,
         models : StateUser.UserModel,
         caller : UserType.UserId,
         name : Text,
@@ -21,6 +22,7 @@ module {
                 return #err("User already has a profile with DID: " # existing_did);
             };
             case null {
+                let did_user = StateUser.get_user_counter(state);
                 // Generate new DID - in production, this would be more sophisticated
                 let did = "did:skillswap:" # Nat.toText(did_user);
 

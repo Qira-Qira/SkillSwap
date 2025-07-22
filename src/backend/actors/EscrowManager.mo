@@ -18,7 +18,7 @@ actor EscrowManager {
 
     // Stable storage for upgrades
     private stable var escrow_entries_stable : [(BookingSession.BookingId, EscrowType.EscrowEntry)] = [];
-    
+
     // Runtime HashMap for efficient operations
     private var escrow_entries : StateEscrow.EscrowEntries = {
         escrow_entries = HashMap.HashMap<BookingSession.BookingId, EscrowType.EscrowEntry>(0, Nat.equal, Hash.hash);
@@ -31,19 +31,19 @@ actor EscrowManager {
 
     system func postupgrade() {
         let new_map = HashMap.HashMap<BookingSession.BookingId, EscrowType.EscrowEntry>(
-            escrow_entries_stable.size(), 
-            Nat.equal, 
-            Hash.hash
+            escrow_entries_stable.size(),
+            Nat.equal,
+            Hash.hash,
         );
-        
+
         for ((booking_id, escrow_entry) in escrow_entries_stable.vals()) {
             new_map.put(booking_id, escrow_entry);
         };
-        
+
         escrow_entries := {
             escrow_entries = new_map;
         };
-        
+
         escrow_entries_stable := [];
     };
 
@@ -56,34 +56,17 @@ actor EscrowManager {
 
     // Lock tokens in escrow for a booking
     public func create_escrow(booking_id : BookingSession.BookingId, learner_did : UserType.DID, tutor_did : UserType.DID, amount : Nat) : async ApiResponse.ApiResult<EscrowType.EscrowEntry> {
-        let result_lock_swt_escrow = await token_manager.lock_swt_escrow(learner_did, amount, booking_id);
-        await CreateEscrow.create_escrow(result_lock_swt_escrow, escrow_entries, booking_id, learner_did, tutor_did, amount);
+        await CreateEscrow.create_escrow(token_manager, escrow_entries.escrow_entries, booking_id, learner_did, tutor_did, amount);
     };
 
     // Release escrowed tokens to tutor after successful session
     public func release_escrow(booking_id : BookingSession.BookingId) : async ApiResponse.ApiResult<EscrowType.EscrowEntry> {
-        switch (escrow_entries.escrow_entries.get(booking_id)) {
-            case (?escrow) {
-                let result_release_swt_escrow = await token_manager.release_swt_escrow(escrow.tutor_did, escrow.amount, booking_id);
-                await ReleaseEscrow.release_escrow(escrow_entries, result_release_swt_escrow, booking_id);
-            };
-            case null {
-                return #err("Escrow not found");
-            };
-        };
+        await ReleaseEscrow.release_escrow(token_manager, escrow_entries.escrow_entries, booking_id);
     };
 
     // Refund escrowed tokens back to learner
     public func refund_escrow(booking_id : BookingSession.BookingId) : async ApiResponse.ApiResult<EscrowType.EscrowEntry> {
-        switch (escrow_entries.escrow_entries.get(booking_id)) {
-            case (?escrow) {
-                let result_refund_swt_escrow = await token_manager.refund_swt_escrow(escrow.learner_did, escrow.amount, booking_id);
-                await RefundEscrow.refund_escrow(escrow_entries, result_refund_swt_escrow, booking_id);
-            };
-            case (null) {
-                return #err("Escrow not found");
-            };
-        };
+        await RefundEscrow.refund_escrow(token_manager, escrow_entries.escrow_entries, booking_id);
     };
 
     // Auto-release escrow after timeout (called by timer or manually)

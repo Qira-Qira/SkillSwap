@@ -15,6 +15,10 @@ import CreateListing "../services/marketplace/CreateListing";
 import CreateBooking "../services/marketplace/CreateBooking";
 import MarkSessionComplete "../services/marketplace/MarkSessionComplete";
 import ScheduleSession "../services/marketplace/ScheduleSession";
+import BrowseListings "../services/marketplace/BrowseListings";
+import GetListing "../services/marketplace/GetListing";
+import GetLearnerBookings "../services/marketplace/GetLearnerBookings";
+import GetTutorListings "../services/marketplace/GetTutorListings";
 
 actor Marketplace {
 
@@ -55,35 +59,12 @@ actor Marketplace {
 
     // Browse all active listings
     public query func browse_listings(skill_filter : ?Text) : async [MarketplaceListing.Listing] {
-        let listing_buffer = Buffer.Buffer<MarketplaceListing.Listing>(0);
-
-        for ((id, listing) in marketplace_hashmap.listings.entries()) {
-            if (listing.status == #Active) {
-                switch (skill_filter) {
-                    case null {
-                        listing_buffer.add(listing);
-                    };
-                    case (?skill) {
-                        // Check if the listing contains the requested skill
-                        let has_skill = Array.find<Text>(listing.skills, func(s) { s == skill });
-                        switch (has_skill) {
-                            case (?_) { listing_buffer.add(listing) };
-                            case null { /* skip */ };
-                        };
-                    };
-                };
-            };
-        };
-
-        Buffer.toArray(listing_buffer);
+        return BrowseListings.browse_listings(marketplace_hashmap.listings, skill_filter);
     };
 
     // Get specific listing details
     public query func get_listing(listing_id : MarketplaceListing.ListingId) : async ApiResponse.ApiResult<MarketplaceListing.Listing> {
-        switch (marketplace_hashmap.listings.get(listing_id)) {
-            case (?listing) { #ok(listing) };
-            case null { #err("Listing not found") };
-        };
+        return GetListing.get_listing(marketplace_hashmap.listings, listing_id);
     };
 
     // Create booking for a listing
@@ -121,31 +102,11 @@ actor Marketplace {
 
     // Get user's bookings (as learner)
     public query func get_learner_bookings(learner_did : UserType.DID) : async [BookingSession.Booking] {
-        let booking_ids = Option.get(marketplace_hashmap.learner_bookings.get(learner_did), []);
-        let booking_buffer = Buffer.Buffer<BookingSession.Booking>(booking_ids.size());
-
-        for (booking_id in booking_ids.vals()) {
-            switch (marketplace_hashmap.bookings.get(booking_id)) {
-                case (?booking) { booking_buffer.add(booking) };
-                case null { /* skip invalid booking */ };
-            };
-        };
-
-        Buffer.toArray(booking_buffer);
+       return GetLearnerBookings.get_learner_bookings(marketplace_hashmap.learner_bookings, marketplace_hashmap.bookings, learner_did);
     };
 
     // Get tutor's listings
     public query func get_tutor_listings(tutor_did : UserType.DID) : async [MarketplaceListing.Listing] {
-        let listing_ids = Option.get(marketplace_hashmap.tutor_listings.get(tutor_did), []);
-        let listing_buffer = Buffer.Buffer<MarketplaceListing.Listing>(listing_ids.size());
-
-        for (listing_id in listing_ids.vals()) {
-            switch (marketplace_hashmap.listings.get(listing_id)) {
-                case (?listing) { listing_buffer.add(listing) };
-                case null { /* skip invalid listing */ };
-            };
-        };
-
-        Buffer.toArray(listing_buffer);
+       return GetTutorListings.get_tutor_listings(marketplace_hashmap.tutor_listings, marketplace_hashmap.listings, tutor_did);
     };
 };

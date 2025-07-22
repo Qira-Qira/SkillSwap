@@ -3,17 +3,31 @@ import UserType "../../types/UserType";
 import ApiResponse "../../types/APIResponse";
 import EscrowType "../../types/EscrowType";
 import Time "mo:base/Time";
+import HashMap "mo:base/HashMap";
 import StateEscrow "../../storages/StateEscrow";
 
 module {
     // Lock tokens in escrow for a booking
-    public func create_escrow(result_lock_swt_escrow : ApiResponse.ApiResult<()> , escrow_entries : StateEscrow.EscrowEntries, booking_id : BookingSession.BookingId, learner_did : UserType.DID, tutor_did : UserType.DID, amount : Nat) : async ApiResponse.ApiResult<EscrowType.EscrowEntry> {
+    public func create_escrow(
+        token_manager : actor {
+            lock_swt_escrow : (UserType.DID, Nat, BookingSession.BookingId) -> async ApiResponse.ApiResult<()>;
+            release_swt_escrow : (UserType.DID, Nat, BookingSession.BookingId) -> async ApiResponse.ApiResult<()>;
+            refund_swt_escrow : (UserType.DID, Nat, BookingSession.BookingId) -> async ApiResponse.ApiResult<()>;
+        },
+        escrow_entries_escrow_entries : HashMap.HashMap<BookingSession.BookingId, EscrowType.EscrowEntry>,
+        booking_id : BookingSession.BookingId,
+        learner_did : UserType.DID,
+        tutor_did : UserType.DID,
+        amount : Nat,
+    ) : async ApiResponse.ApiResult<EscrowType.EscrowEntry> {
         // Check if escrow already exists
-        switch (escrow_entries.escrow_entries.get(booking_id)) {
+        switch (escrow_entries_escrow_entries.get(booking_id)) {
             case (?existing) {
                 return #err("Escrow already exists for this booking");
             };
             case null {
+                let result_lock_swt_escrow = await token_manager.lock_swt_escrow(learner_did, amount, booking_id);
+
                 // Lock tokens via TokenManager
                 switch (result_lock_swt_escrow) {
                     case (#err(msg)) {
@@ -32,7 +46,7 @@ module {
                             auto_release_at = auto_release_time;
                         };
 
-                        escrow_entries.escrow_entries.put(booking_id, escrow_entry);
+                        escrow_entries_escrow_entries.put(booking_id, escrow_entry);
                         return #ok(escrow_entry);
                     };
                 };

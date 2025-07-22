@@ -10,7 +10,23 @@ import MintBadges "MintBadges";
 
 module {
     // Check and mint badges for user based on achievements
-    public func check_and_mint_badges(badge_counter : StateBadge.BadgeCounter, certified_tutor_sessions : Nat, top_rated_min_rating : Float, milestone_sessions : [Nat], badge_hashmap : StateBadge.BadgeHashmap, avg_rating : Float, user_result : ApiResponse.ApiResult<UserType.UserProfile>, user_did : UserType.DID) : async ApiResponse.ApiResult<[BadgeNft.Badge]> {
+    public func check_and_mint_badges(
+        badge_counter : StateBadge.BadgeCounter,
+        certified_tutor_sessions : Nat,
+        top_rated_min_rating : Float,
+        milestone_sessions : [Nat],
+        badge_hashmap : StateBadge.BadgeHashmap,
+        rating_manager : actor {
+            get_user_average_rating : (UserType.DID) -> async Float;
+        },
+        user_manager : actor {
+            get_user_profile : (UserType.DID) -> async ApiResponse.ApiResult<UserType.UserProfile>;
+        },
+        user_did : UserType.DID,
+    ) : async ApiResponse.ApiResult<[BadgeNft.Badge]> {
+        
+        let user_result = await user_manager.get_user_profile(user_did);
+        let avg_rating = await rating_manager.get_user_average_rating(user_did);
 
         // Get user profile
         let user_profile = switch (user_result) {
